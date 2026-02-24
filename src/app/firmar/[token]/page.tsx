@@ -53,7 +53,9 @@ export default function FirmarPage({ params }: { params: Promise<{ token: string
 
     const handleFirmar = async () => {
         if (!solicitud || padRef.current?.isEmpty() || !aceptado) return;
+        if (!padRef.current) return; // TypeScript null guard
         const dataUrl = padRef.current.toDataURL("image/png");
+
 
         setEnviando(true);
         const { error } = await supabase
