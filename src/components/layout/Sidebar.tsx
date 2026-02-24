@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderOpen, Users, Receipt, Calendar, Scale, FileSignature, BookOpen, Users2, Settings, MessageSquare } from "lucide-react";
+import { FolderOpen, Users, Receipt, Calendar, Scale, FileSignature, BookOpen, Users2, Settings, MessageSquare, UserCog } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export function Sidebar() {
@@ -23,7 +23,7 @@ export function Sidebar() {
 
   // Admin only items
   if (isAdmin) {
-    navItems.push({ label: "Gestión Usuarios", href: "/ajustes/usuarios", icon: Settings, accent: "slate" });
+    navItems.push({ label: "Equipo", href: "/equipo", icon: UserCog, accent: "slate" });
   }
 
   const accentClasses: Record<string, string> = {
