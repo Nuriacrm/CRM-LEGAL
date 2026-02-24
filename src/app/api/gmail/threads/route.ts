@@ -18,10 +18,7 @@ function makeOAuth2Client() {
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const clienteEmail = searchParams.get('email');
-
-    if (!clienteEmail) {
-        return NextResponse.json({ error: 'Se requiere el parámetro email' }, { status: 400 });
-    }
+    const query = clienteEmail ? `from:${clienteEmail} OR to:${clienteEmail}` : "in:inbox OR in:sent";
 
     // 1. Verificar sesión Supabase
     const cookieStore = await cookies();
@@ -103,7 +100,7 @@ export async function GET(req: Request) {
     try {
         const threadsRes = await gmail.users.threads.list({
             userId: 'me',
-            q: `from:${clienteEmail} OR to:${clienteEmail}`,
+            q: query,
             maxResults: 20,
         });
 

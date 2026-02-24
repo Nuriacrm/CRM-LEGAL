@@ -23,6 +23,7 @@ export function Sidebar() {
 
   // Admin only items
   if (isAdmin) {
+    navItems.push({ label: "Correo Gmail", href: "/correo", icon: MessageSquare, accent: "teal" });
     navItems.push({ label: "Equipo", href: "/equipo", icon: UserCog, accent: "slate" });
   }
 
