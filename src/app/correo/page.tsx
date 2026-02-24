@@ -20,6 +20,7 @@ export default function CorreoGlobalPage() {
     const [authUrl, setAuthUrl] = useState("");
     const [searchClient, setSearchClient] = useState("");
     const [selectedClientEmail, setSelectedClientEmail] = useState<string | null>(null);
+    const [selectedExpedienteId, setSelectedExpedienteId] = useState<string | null>(null);
     const [isSendModalOpen, setIsSendModalOpen] = useState(false);
 
     const fetchEmails = useCallback(async (emailFilter: string | null = null) => {
@@ -149,10 +150,22 @@ export default function CorreoGlobalPage() {
                                 {filteredClients.map(c => (
                                     <button
                                         key={c.id}
-                                        onClick={() => {
+                                        onClick={async () => {
                                             setSelectedClientEmail(c.email);
                                             setSearchClient("");
                                             fetchEmails(c.email);
+
+                                            // Buscar el expediente más reciente de este cliente para vincular correos
+                                            const { data: expData } = await supabase
+                                                .from('expedientes')
+                                                .select('id')
+                                                .eq('cliente_id', c.id)
+                                                .order('created_at', { ascending: false })
+                                                .limit(1)
+                                                .single();
+
+                                            if (expData) setSelectedExpedienteId(expData.id);
+                                            else setSelectedExpedienteId(null);
                                         }}
                                         className="w-full px-4 py-3 text-left hover:bg-slate-800 flex items-center justify-between group transition-colors border-b border-slate-800 last:border-0"
                                     >
@@ -291,6 +304,7 @@ export default function CorreoGlobalPage() {
                 onClose={() => setIsSendModalOpen(false)}
                 recipientEmail={selectedClientEmail || ""}
                 initialSubject={selectedClientEmail ? "Información sobre su expediente" : ""}
+                expedienteId={selectedExpedienteId || undefined}
                 onSent={() => fetchEmails(selectedClientEmail)}
             />
         </div>

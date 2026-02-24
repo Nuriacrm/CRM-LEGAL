@@ -11,7 +11,7 @@ import Link from "next/link";
 import { CalculadoraExpediente } from "@/components/expedientes/CalculadoraExpediente";
 import { ModuloMediacion } from "@/components/expedientes/ModuloMediacion";
 import { WhatsAppModal } from "@/components/whatsapp/WhatsAppModal";
-import { MessageSquare, Loader2, RefreshCw, Mail as MailIcon, Clock, Plus } from "lucide-react";
+import { MessageSquare, Loader2, RefreshCw, Mail as MailIcon, Clock, Plus, CloudDownload, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { SendEmailModal } from "@/components/gmail/SendEmailModal";
 
@@ -349,11 +349,22 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
 
     const TabCorreo = () => {
         const [emails, setEmails] = useState<any[]>([]);
+        const [savedMessages, setSavedMessages] = useState<any[]>([]);
         const [loading, setLoading] = useState(false);
+        const [syncingThreads, setSyncingThreads] = useState<Record<string, boolean>>({});
         const [error, setError] = useState<string | null>(null);
         const [needsAuth, setNeedsAuth] = useState(false);
         const [authUrl, setAuthUrl] = useState<string>("");
         const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+
+        const fetchSavedMessages = async () => {
+            const { data } = await supabase
+                .from('mensajes_gmail')
+                .select('*')
+                .eq('expediente_id', id)
+                .order('fecha', { ascending: false });
+            if (data) setSavedMessages(data);
+        };
 
         const fetchEmails = async () => {
             if (!clienteExp?.email) return;
@@ -376,6 +387,24 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
                 setError("Error al conectar con el servidor");
             } finally {
                 setLoading(false);
+            }
+            fetchSavedMessages();
+        };
+
+        const saveThread = async (threadId: string) => {
+            setSyncingThreads(prev => ({ ...prev, [threadId]: true }));
+            try {
+                const res = await fetch('/api/gmail/sync-thread', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ threadId, expedienteId: id })
+                });
+                if (!res.ok) throw new Error('Error al sincronizar');
+                fetchSavedMessages();
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setSyncingThreads(prev => ({ ...prev, [threadId]: false }));
             }
         };
 
@@ -439,6 +468,7 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
                     onClose={() => setIsSendModalOpen(false)}
                     recipientEmail={clienteExp.email}
                     initialSubject={`Expediente: ${caratula ?? numeroExpediente ?? ''}`}
+                    expedienteId={id} // Pasar el ID para el registro
                     onSent={() => {
                         fetchEmails();
                         setToastMensaje({
@@ -466,29 +496,82 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
                     </div>
                 ) : (
                     <div className="divide-y divide-slate-800/50">
-                        {emails.map((t) => (
-                            <div key={t.id} className="p-5 hover:bg-slate-800/40 transition-colors group cursor-default">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h4 className="font-bold text-slate-200 text-sm group-hover:text-cyan-400 transition-colors truncate pr-4">
-                                        {t.subject}
-                                    </h4>
-                                    <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap bg-slate-800 px-2 py-0.5 rounded-full">
-                                        {new Date(t.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
-                                    </span>
+                        {emails.map((t) => {
+                            const isSaved = savedMessages.some(sm => sm.asunto === t.subject); // Heurística simple
+                            return (
+                                <div key={t.id} className="p-5 hover:bg-slate-800/40 transition-colors group cursor-default">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="font-bold text-slate-200 text-sm group-hover:text-cyan-400 transition-colors truncate pr-4">
+                                            {t.subject}
+                                        </h4>
+                                        <div className="flex items-center gap-3">
+                                            <button
+                                                onClick={() => saveThread(t.id)}
+                                                disabled={syncingThreads[t.id] || isSaved}
+                                                className={`p-1.5 rounded-lg border transition-all ${isSaved
+                                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
+                                                    }`}
+                                                title={isSaved ? "Registrado en expediente" : "Guardar permanentemente en expediente"}
+                                            >
+                                                {syncingThreads[t.id] ? (
+                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                ) : isSaved ? (
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                ) : (
+                                                    <CloudDownload className="w-3.5 h-3.5" />
+                                                )}
+                                            </button>
+                                            <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap bg-slate-800 px-2 py-0.5 rounded-full">
+                                                {new Date(t.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-3">
+                                        {t.snippet}
+                                    </p>
+                                    <div className="flex items-center gap-4 text-[10px] text-slate-500">
+                                        <span className="flex items-center gap-1">
+                                            <User className="w-3 h-3" /> {t.from.split('<')[0].trim()}
+                                        </span>
+                                        <span className="bg-slate-800/50 px-1.5 py-0.5 rounded transition-colors group-hover:bg-cyan-500/10 group-hover:text-cyan-400">
+                                            {t.msgCount} {t.msgCount === 1 ? 'mensaje' : 'mensajes'}
+                                        </span>
+                                    </div>
                                 </div>
-                                <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-3">
-                                    {t.snippet}
-                                </p>
-                                <div className="flex items-center gap-4 text-[10px] text-slate-500">
-                                    <span className="flex items-center gap-1">
-                                        <User className="w-3 h-3" /> {t.from.split('<')[0].trim()}
-                                    </span>
-                                    <span className="bg-slate-800/50 px-1.5 py-0.5 rounded transition-colors group-hover:bg-cyan-500/10 group-hover:text-cyan-400">
-                                        {t.msgCount} {t.msgCount === 1 ? 'mensaje' : 'mensajes'}
-                                    </span>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {savedMessages.length > 0 && (
+                    <div className="bg-slate-950/50 border-t border-slate-800">
+                        <div className="p-4 border-b border-slate-800 bg-slate-900/30">
+                            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                Historial Permanente Reservado en CRM
+                            </h4>
+                        </div>
+                        <div className="divide-y divide-slate-800/30 max-h-60 overflow-y-auto">
+                            {savedMessages.map((sm) => (
+                                <div key={sm.id} className="p-4 hover:bg-slate-800/20 transition-colors flex items-center justify-between gap-4">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center justify-between mb-1">
+                                            <p className="text-sm font-bold text-slate-300 truncate">{sm.asunto}</p>
+                                            <span className="text-[9px] text-slate-500 font-mono">
+                                                {new Date(sm.fecha).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 truncate">
+                                            <span className="text-emerald-500/70">De:</span> {sm.emisor}
+                                        </p>
+                                    </div>
+                                    <div className="p-1.5 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                                        <FileText className="w-3 h-3 text-emerald-500/50" />
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 )}
 

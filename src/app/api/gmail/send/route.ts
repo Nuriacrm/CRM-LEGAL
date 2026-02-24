@@ -22,7 +22,7 @@ function makeOAuth2Client() {
 
 export async function POST(req: Request) {
     try {
-        const { to, subject, body } = await req.json();
+        const { to, subject, body, expediente_id } = await req.json();
 
         if (!to || !subject || !body) {
             return NextResponse.json({ error: 'Faltan campos obligatorios (to, subject, body)' }, { status: 400 });
@@ -63,13 +63,15 @@ export async function POST(req: Request) {
 
         const { data: profile } = await supabaseAdmin
             .from('profiles')
-            .select('google_access_token, google_refresh_token, google_token_expiry')
+            .select('google_access_token, google_refresh_token, google_token_expiry, email')
             .eq('id', user.id)
             .single();
 
         if (!profile?.google_refresh_token) {
             return NextResponse.json({ error: 'Google no conectado' }, { status: 401 });
         }
+
+        const userEmail = profile.email || 'Arau.derechoymediacion@gmail.com';
 
         // 4. Configurar Gmail Client
         const auth = makeOAuth2Client();
@@ -81,10 +83,10 @@ export async function POST(req: Request) {
 
         const gmail = google.gmail({ version: 'v1', auth });
 
-        // 5. Construir mensaje RFC 2822
-        // Nota: UTF-8 encoding simple
+        // 5. Construir mensaje RFC 2822 (Importante: Usar \r\n como separador)
         const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
         const messageParts = [
+            `From: ${userEmail}`,
             `To: ${to}`,
             `Subject: ${utf8Subject}`,
             'Content-Type: text/plain; charset=utf-8',
@@ -92,17 +94,31 @@ export async function POST(req: Request) {
             '',
             body,
         ];
-        const message = messageParts.join('\n');
+        const message = messageParts.join('\r\n');
         const encodedMessage = encodeSafeBase64(message);
 
-        const res = await gmail.users.messages.send({
+        const gmailRes = await gmail.users.messages.send({
             userId: 'me',
             requestBody: {
                 raw: encodedMessage,
             },
         });
 
-        return NextResponse.json({ success: true, messageId: res.data.id });
+        const messageId = gmailRes.data.id;
+
+        // 6. PERSISTENCIA: Si hay expediente_id, guardamos en la tabla mensajes_gmail
+        if (expediente_id && messageId) {
+            await supabaseAdmin.from('mensajes_gmail').insert({
+                expediente_id,
+                message_id: messageId,
+                emisor: userEmail,
+                destinatario: to,
+                asunto: subject,
+                cuerpo: body,
+            });
+        }
+
+        return NextResponse.json({ success: true, messageId });
 
     } catch (err: any) {
         console.error('Error enviando Gmail:', err);

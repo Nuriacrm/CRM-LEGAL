@@ -9,9 +9,10 @@ interface SendEmailModalProps {
     recipientEmail: string;
     onSent?: () => void;
     initialSubject?: string;
+    expedienteId?: string; // Nuevo prop
 }
 
-export function SendEmailModal({ isOpen, onClose, recipientEmail, onSent, initialSubject }: SendEmailModalProps) {
+export function SendEmailModal({ isOpen, onClose, recipientEmail, onSent, initialSubject, expedienteId }: SendEmailModalProps) {
     const [to, setTo] = useState(recipientEmail || "");
     const [subject, setSubject] = useState(initialSubject || "");
     const [body, setBody] = useState("");
@@ -39,6 +40,7 @@ export function SendEmailModal({ isOpen, onClose, recipientEmail, onSent, initia
                     to: to,
                     subject,
                     body,
+                    expediente_id: expedienteId, // Enviar el ID para registro permanente
                 }),
             });
 
