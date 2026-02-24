@@ -1,17 +1,24 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, Calculator, Clock, Plus, MapPin, Users, Loader2, Mail, AlertCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, Calculator, Clock, Plus, MapPin, Users, Loader2, Mail, AlertCircle, Gavel, Bell, ExternalLink } from 'lucide-react';
 import { CalculadoraPlazos } from '@/components/agenda/CalculadoraPlazos';
 import { SmartCalendar } from '@/components/agenda/SmartCalendar';
 import { EventModal } from '@/components/agenda/EventModal';
 import { supabase } from '@/lib/supabase';
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import Link from 'next/link';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
+
+const TIPO_PLAZO_META: Record<string, { icon: React.ReactNode; chip: string; label: string }> = {
+    'Plazo Procesal': { icon: <Gavel className="w-5 h-5" />, chip: 'bg-red-500/20 text-red-400', label: '🔴 Plazo Procesal' },
+    'Vencimiento': { icon: <AlertCircle className="w-5 h-5" />, chip: 'bg-orange-500/20 text-orange-400', label: '🟠 Vencimiento' },
+    'Notificación Recibida': { icon: <Bell className="w-5 h-5" />, chip: 'bg-blue-500/20 text-blue-400', label: '🔵 Notificación' },
+};
 
 export default function AgendaPage() {
     const [activeTab, setActiveTab] = useState<'calendario' | 'calculadora'>('calendario');
@@ -25,12 +32,10 @@ export default function AgendaPage() {
         setLoading(true);
         const { data, error } = await supabase
             .from('citas')
-            .select('*')
+            .select('id, asunto, fecha_hora, tipo, tipo_plazo, ubicacion, es_critico, color_hex, expediente_id')
             .order('fecha_hora', { ascending: true });
 
-        if (!error && data) {
-            setEventos(data);
-        }
+        if (!error && data) setEventos(data);
         setLoading(false);
     };
 
@@ -127,48 +132,62 @@ export default function AgendaPage() {
                             </div>
                         </div>
 
-                        <div className="space-y-4">
-                            {eventos.filter(e => new Date(e.fecha_hora) >= new Date()).slice(0, 5).map(evento => (
-                                <div
-                                    key={evento.id}
-                                    onClick={() => handleOpenEditModal(evento)}
-                                    className="group relative bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 hover:border-cyan-500/50 transition-all cursor-pointer"
-                                >
-                                    {evento.es_critico && (
-                                        <div className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg animate-pulse">
-                                            <AlertCircle className="w-4 h-4" />
-                                        </div>
-                                    )}
-                                    <div className="flex items-start gap-4">
-                                        <div className={cn(
-                                            "p-3 rounded-xl",
-                                            evento.tipo === 'mediacion' ? "bg-blue-600/20 text-blue-400" :
-                                                evento.tipo === 'vencimiento' || evento.es_critico ? "bg-red-500/20 text-red-500" :
-                                                    "bg-cyan-500/10 text-cyan-400"
-                                        )}>
-                                            {evento.tipo === 'vencimiento' || evento.es_critico ? <AlertCircle className="w-5 h-5" /> :
-                                                evento.tipo === 'mediacion' ? <Users className="w-5 h-5" /> : <CalendarIcon className="w-5 h-5" />}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="text-slate-200 font-bold text-sm truncate group-hover:text-cyan-400 transition-colors uppercase tracking-tight">
-                                                {evento.asunto}
-                                            </h4>
-                                            <div className="mt-2 space-y-1">
-                                                <div className="flex items-center gap-2 text-xs text-slate-400">
-                                                    <Clock className="w-3 h-3" />
-                                                    {new Date(evento.fecha_hora).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                </div>
-                                                {evento.ubicacion && (
-                                                    <div className="flex items-center gap-2 text-xs text-slate-500">
-                                                        <MapPin className="w-3 h-3" />
-                                                        {evento.ubicacion}
-                                                    </div>
+                        <div className="space-y-3">
+                            {eventos.filter(e => new Date(e.fecha_hora) >= new Date()).slice(0, 6).map(evento => {
+                                const meta = evento.tipo_plazo ? TIPO_PLAZO_META[evento.tipo_plazo] : null;
+                                return (
+                                    <div
+                                        key={evento.id}
+                                        onClick={() => evento.expediente_id
+                                            ? undefined  // handled by Link below
+                                            : handleOpenEditModal(evento)}
+                                        className="group relative bg-slate-800/50 border border-slate-700/50 rounded-2xl p-4 hover:border-cyan-500/50 transition-all cursor-pointer"
+                                    >
+                                        {evento.es_critico && (
+                                            <div className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-lg animate-pulse">
+                                                <AlertCircle className="w-4 h-4" />
+                                            </div>
+                                        )}
+                                        <div className="flex items-start gap-3">
+                                            <div className={cn(
+                                                "p-2.5 rounded-xl shrink-0",
+                                                meta?.chip ?? (evento.tipo === 'mediacion' ? 'bg-purple-600/20 text-purple-400' :
+                                                    evento.es_critico ? 'bg-red-500/20 text-red-400' : 'bg-cyan-500/10 text-cyan-400')
+                                            )}>
+                                                {meta?.icon ?? (evento.tipo === 'mediacion' ? <Users className="w-5 h-5" /> : <CalendarIcon className="w-5 h-5" />)}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-slate-200 font-bold text-sm truncate group-hover:text-cyan-400 transition-colors">
+                                                    {evento.asunto}
+                                                </h4>
+                                                {meta && (
+                                                    <span className={cn("text-[10px] font-semibold px-1.5 py-0.5 rounded-full", meta.chip)}>{meta.label}</span>
                                                 )}
+                                                <div className="mt-1.5 space-y-1">
+                                                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                                                        <Clock className="w-3 h-3" />
+                                                        {new Date(evento.fecha_hora).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
+                                                    {evento.ubicacion && (
+                                                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                            <MapPin className="w-3 h-3" />{evento.ubicacion}
+                                                        </div>
+                                                    )}
+                                                    {evento.expediente_id && (
+                                                        <Link
+                                                            href={`/expedientes/${evento.expediente_id}`}
+                                                            onClick={e => e.stopPropagation()}
+                                                            className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+                                                        >
+                                                            <ExternalLink className="w-3 h-3" /> Ver expediente
+                                                        </Link>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
 
                             {eventos.length === 0 && !loading && (
                                 <div className="text-center py-10">
