@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X, Send, Loader2, Mail } from "lucide-react";
 
 interface SendEmailModalProps {
@@ -12,14 +12,20 @@ interface SendEmailModalProps {
 }
 
 export function SendEmailModal({ isOpen, onClose, recipientEmail, onSent, initialSubject }: SendEmailModalProps) {
+    const [to, setTo] = useState(recipientEmail || "");
     const [subject, setSubject] = useState(initialSubject || "");
     const [body, setBody] = useState("");
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Actualizar 'to' si cambia recipientEmail externamente (ej: al cambiar de expediente)
+    useEffect(() => {
+        setTo(recipientEmail || "");
+    }, [recipientEmail]);
+
     const handleSend = async () => {
-        if (!subject || !body) {
-            setError("Por favor, completa el asunto y el mensaje.");
+        if (!to || !subject || !body) {
+            setError("Por favor, completa el destinatario, el asunto y el mensaje.");
             return;
         }
 
@@ -30,7 +36,7 @@ export function SendEmailModal({ isOpen, onClose, recipientEmail, onSent, initia
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    to: recipientEmail,
+                    to: to,
                     subject,
                     body,
                 }),
@@ -70,9 +76,13 @@ export function SendEmailModal({ isOpen, onClose, recipientEmail, onSent, initia
                 <div className="p-6 space-y-4">
                     <div>
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5 ml-1">Destinatario</label>
-                        <div className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-400 text-sm font-medium">
-                            {recipientEmail}
-                        </div>
+                        <input
+                            type="email"
+                            value={to}
+                            onChange={(e) => setTo(e.target.value)}
+                            placeholder="nombre@ejemplo.com"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder:text-slate-600"
+                        />
                     </div>
 
                     <div>

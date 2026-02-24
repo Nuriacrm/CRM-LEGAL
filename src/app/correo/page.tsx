@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
     Mail, Search, RefreshCw, Loader2, Plus,
-    User, ArrowRight, CornerDownRight, Clock, AlertTriangle, ChevronRight
+    User, ArrowRight, CornerDownRight, Clock, AlertTriangle, ChevronRight, ExternalLink
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -102,6 +102,15 @@ export default function CorreoGlobalPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
+                        <a
+                            href="https://mail.google.com/mail/u/?authuser=Arau.derechoymediacion@gmail.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all font-bold text-sm"
+                        >
+                            <ExternalLink className="w-4 h-4" />
+                            Ir a Gmail
+                        </a>
                         <button
                             onClick={() => setIsSendModalOpen(true)}
                             className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-blue-900/30 active:scale-95"
