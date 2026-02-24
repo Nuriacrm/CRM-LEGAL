@@ -125,7 +125,7 @@ export function SendEmailModal({ isOpen, onClose, recipientEmail, onSent, initia
                         ) : (
                             <>
                                 <Send className="w-4 h-4" />
-                                Enviar Correo
+                                Enviar vía Gmail
                             </>
                         )}
                     </button>

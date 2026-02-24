@@ -439,7 +439,14 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
                     onClose={() => setIsSendModalOpen(false)}
                     recipientEmail={clienteExp.email}
                     initialSubject={`Expediente: ${caratula ?? numeroExpediente ?? ''}`}
-                    onSent={fetchEmails}
+                    onSent={() => {
+                        fetchEmails();
+                        setToastMensaje({
+                            titulo: 'Email enviado correctamente',
+                            descripcion: `Se ha enviado el correo a ${clienteExp.email} y quedará registrado en el historial.`
+                        });
+                        setTimeout(() => setToastMensaje(null), 5000);
+                    }}
                 />
 
                 {loading && emails.length === 0 ? (
