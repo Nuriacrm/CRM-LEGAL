@@ -11,8 +11,9 @@ import Link from "next/link";
 import { CalculadoraExpediente } from "@/components/expedientes/CalculadoraExpediente";
 import { ModuloMediacion } from "@/components/expedientes/ModuloMediacion";
 import { WhatsAppModal } from "@/components/whatsapp/WhatsAppModal";
-import { MessageSquare, Loader2, RefreshCw, Mail as MailIcon, Clock } from "lucide-react";
+import { MessageSquare, Loader2, RefreshCw, Mail as MailIcon, Clock, Plus } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { SendEmailModal } from "@/components/gmail/SendEmailModal";
 
 type ClienteData = { id: string; nombre: string; apellidos: string | null; telefono: string | null; email: string | null };
 type ContrarioItem = { id: string; nombre: string; tipo: string; despacho: string | null; telefono: string | null; ciudad: string | null };
@@ -352,6 +353,7 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
         const [error, setError] = useState<string | null>(null);
         const [needsAuth, setNeedsAuth] = useState(false);
         const [authUrl, setAuthUrl] = useState<string>("");
+        const [isSendModalOpen, setIsSendModalOpen] = useState(false);
 
         const fetchEmails = async () => {
             if (!clienteExp?.email) return;
@@ -417,11 +419,28 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
                         </h3>
                         <p className="text-xs text-slate-500 mt-1">Hilos recientes con {clienteExp.email}</p>
                     </div>
-                    <button onClick={fetchEmails} disabled={loading}
-                        className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all disabled:opacity-50">
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setIsSendModalOpen(true)}
+                            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-lg shadow-blue-900/20 group"
+                        >
+                            <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
+                            Redactar
+                        </button>
+                        <button onClick={fetchEmails} disabled={loading}
+                            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all disabled:opacity-50 border border-slate-700">
+                            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        </button>
+                    </div>
                 </div>
+
+                <SendEmailModal
+                    isOpen={isSendModalOpen}
+                    onClose={() => setIsSendModalOpen(false)}
+                    recipientEmail={clienteExp.email}
+                    initialSubject={`Expediente: ${caratula ?? numeroExpediente ?? ''}`}
+                    onSent={fetchEmails}
+                />
 
                 {loading && emails.length === 0 ? (
                     <div className="p-20 text-center">
