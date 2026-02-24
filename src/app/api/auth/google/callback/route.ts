@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { googleCalendarService } from '@/lib/google';
@@ -11,21 +11,21 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/agenda?error=no_code`);
     }
 
-    const cookieStore = cookies();
+    // Next.js 15+: cookies() is async
+    const cookieStore = await cookies();
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
         {
             cookies: {
-                get(name: string) {
-                    return cookieStore.get(name)?.value;
+                getAll() {
+                    return cookieStore.getAll();
                 },
-                set(name: string, value: string, options: CookieOptions) {
-                    cookieStore.set({ name, value, ...options });
-                },
-                remove(name: string, options: CookieOptions) {
-                    cookieStore.set({ name, value: '', ...options });
+                setAll(cookiesToSet) {
+                    cookiesToSet.forEach(({ name, value, options }) =>
+                        cookieStore.set(name, value, options)
+                    );
                 },
             },
         }

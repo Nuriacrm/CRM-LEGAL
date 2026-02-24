@@ -99,6 +99,10 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
     const [fechaSalto, setFechaSalto] = useState<string | null>(null);
     const [parteContraria, setParteContraria] = useState('');
 
+    // Datos reales del expediente
+    const [numeroExpediente, setNumeroExpediente] = useState<string | null>(null);
+    const [caratula, setCaratula] = useState<string | null>(null);
+
     // Contrarios y Juzgados desde agenda
     const [contrarios, setContrarios] = useState<ContrarioItem[]>([]);
     const [juzgados, setJuzgados] = useState<JuzgadoItem[]>([]);
@@ -112,32 +116,38 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
     const [loadingCliente, setLoadingCliente] = useState(true);
 
     useEffect(() => {
-        // Fetch expediente details (mostly simulated or from higher level if we had it, but let's fetch client)
-        const fetchClient = async () => {
+        const fetchExpedienteData = async () => {
+            // Cargar datos del expediente (incluyendo titulo real y cliente)
             const { data: expData } = await supabase
                 .from('expedientes')
-                .select('cliente_id')
+                .select('cliente_id, numero_expediente, caratula, categoria')
                 .eq('id', id)
                 .single();
 
-            if (expData?.cliente_id) {
-                const { data: cliData } = await supabase
-                    .from('clientes')
-                    .select('id, nombre, apellidos, telefono')
-                    .eq('id', expData.cliente_id)
-                    .single();
+            if (expData) {
+                setNumeroExpediente(expData.numero_expediente ?? null);
+                setCaratula(expData.caratula ?? null);
+                // Sincronizar fase si viene de BD
+                if (expData.categoria === 'Judicial') setFase('Judicial');
 
-                if (cliData) setClienteExp(cliData);
+                if (expData.cliente_id) {
+                    const { data: cliData } = await supabase
+                        .from('clientes')
+                        .select('id, nombre, apellidos, telefono')
+                        .eq('id', expData.cliente_id)
+                        .single();
+                    if (cliData) setClienteExp(cliData);
+                }
             }
             setLoadingCliente(false);
         };
-        fetchClient();
+        fetchExpedienteData();
 
         supabase.from("contrarios").select("id,nombre,tipo,despacho,telefono,ciudad").order("nombre")
             .then(({ data }) => { setContrarios(data ?? []); setLoadingContrarios(false); });
         supabase.from("juzgados").select("id,nombre,tipo,ciudad,partido_judicial").order("nombre")
             .then(({ data }) => { setJuzgados(data ?? []); setLoadingJuzgados(false); });
-    }, []);
+    }, [id]);
 
     // Modal para pasar a judicial
     const [showModal, setShowModal] = useState(false);
@@ -353,8 +363,8 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
                 <div className="flex items-start justify-between">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <span className="bg-slate-800 text-slate-300 text-xs font-medium px-2.5 py-1 rounded-md">
-                                Exp. #{id.padStart(4, '0')}
+                            <span className="bg-slate-800 text-slate-300 text-xs font-medium px-2.5 py-1 rounded-md font-mono">
+                                {numeroExpediente ?? `Exp. #${id.slice(0, 8)}`}
                             </span>
                             <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${fase === 'Extrajudicial'
                                 ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
@@ -364,7 +374,7 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
                             </span>
                         </div>
                         <h1 className="text-3xl font-bold tracking-tight text-white mb-2">
-                            García c/ López - Reclamación Cantidad
+                            {caratula ?? 'Cargando expediente…'}
                         </h1>
                         {/* Resumen partes en header */}
                         <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
