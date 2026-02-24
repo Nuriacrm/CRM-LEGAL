@@ -11,7 +11,8 @@ import Link from "next/link";
 import { CalculadoraExpediente } from "@/components/expedientes/CalculadoraExpediente";
 import { ModuloMediacion } from "@/components/expedientes/ModuloMediacion";
 import { WhatsAppModal } from "@/components/whatsapp/WhatsAppModal";
-import { MessageSquare, Loader2 } from "lucide-react";
+import { MessageSquare, Loader2, RefreshCw, Mail as MailIcon, Clock } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 type ClienteData = { id: string; nombre: string; apellidos: string | null; telefono: string | null; email: string | null };
 type ContrarioItem = { id: string; nombre: string; tipo: string; despacho: string | null; telefono: string | null; ciudad: string | null };
@@ -345,12 +346,148 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
         </div>
     );
 
+    const TabCorreo = () => {
+        const [emails, setEmails] = useState<any[]>([]);
+        const [loading, setLoading] = useState(false);
+        const [error, setError] = useState<string | null>(null);
+        const [needsAuth, setNeedsAuth] = useState(false);
+        const [authUrl, setAuthUrl] = useState<string>("");
+
+        const fetchEmails = async () => {
+            if (!clienteExp?.email) return;
+            setLoading(true);
+            setError(null);
+            try {
+                const res = await fetch(`/api/gmail/threads?email=${clienteExp.email}`);
+                const data = await res.json();
+                if (!res.ok) {
+                    if (data.needsAuth) {
+                        setNeedsAuth(true);
+                        setAuthUrl(data.authUrl);
+                    } else {
+                        setError(data.error);
+                    }
+                } else {
+                    setEmails(data.threads || []);
+                }
+            } catch (err) {
+                setError("Error al conectar con el servidor");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        useEffect(() => {
+            if (activeTab === 'correo') fetchEmails();
+        }, [clienteExp?.email, activeTab]);
+
+        if (!clienteExp?.email) {
+            return (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
+                    <MailIcon className="w-12 h-12 text-slate-700 mx-auto mb-4" />
+                    <p className="text-slate-400">El cliente no tiene un correo electrónico configurado.</p>
+                </div>
+            );
+        }
+
+        if (needsAuth) {
+            return (
+                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
+                    <div className="bg-blue-500/10 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <MailIcon className="w-8 h-8 text-blue-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white mb-2">Conecta tu Gmail profesional</h3>
+                    <p className="text-slate-400 mb-8 max-w-md mx-auto">
+                        Para ver los correos de este caso, necesitamos permiso para acceder a tu bandeja de entrada de forma segura.
+                    </p>
+                    <a href={authUrl} className="inline-flex items-center gap-2 bg-white text-slate-950 px-6 py-3 rounded-xl font-bold hover:bg-slate-200 transition-all shadow-lg shadow-white/5">
+                        Conectar con Google Workspace
+                    </a>
+                </div>
+            );
+        }
+
+        return (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+                    <div>
+                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                            <MailIcon className="w-5 h-5 text-cyan-400" />
+                            Historial de Correos
+                        </h3>
+                        <p className="text-xs text-slate-500 mt-1">Hilos recientes con {clienteExp.email}</p>
+                    </div>
+                    <button onClick={fetchEmails} disabled={loading}
+                        className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-all disabled:opacity-50">
+                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
+
+                {loading && emails.length === 0 ? (
+                    <div className="p-20 text-center">
+                        <Loader2 className="w-8 h-8 text-cyan-500 animate-spin mx-auto mb-4" />
+                        <p className="text-slate-500 text-sm">Sincronizando con Gmail…</p>
+                    </div>
+                ) : error ? (
+                    <div className="p-12 text-center">
+                        <AlertTriangle className="w-10 h-10 text-red-500/50 mx-auto mb-4" />
+                        <p className="text-red-400 text-sm">{error}</p>
+                        <button onClick={fetchEmails} className="mt-4 text-xs text-emerald-400 hover:underline">Reintentar</button>
+                    </div>
+                ) : emails.length === 0 ? (
+                    <div className="p-20 text-center text-slate-500">
+                        <p className="text-sm">No se han encontrado correos intercambiados con este cliente.</p>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-slate-800/50">
+                        {emails.map((t) => (
+                            <div key={t.id} className="p-5 hover:bg-slate-800/40 transition-colors group cursor-default">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h4 className="font-bold text-slate-200 text-sm group-hover:text-cyan-400 transition-colors truncate pr-4">
+                                        {t.subject}
+                                    </h4>
+                                    <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap bg-slate-800 px-2 py-0.5 rounded-full">
+                                        {new Date(t.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed mb-3">
+                                    {t.snippet}
+                                </p>
+                                <div className="flex items-center gap-4 text-[10px] text-slate-500">
+                                    <span className="flex items-center gap-1">
+                                        <User className="w-3 h-3" /> {t.from.split('<')[0].trim()}
+                                    </span>
+                                    <span className="bg-slate-800/50 px-1.5 py-0.5 rounded transition-colors group-hover:bg-cyan-500/10 group-hover:text-cyan-400">
+                                        {t.msgCount} {t.msgCount === 1 ? 'mensaje' : 'mensajes'}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <div className="p-4 bg-slate-950/30 border-t border-slate-800">
+                    <p className="text-[10px] text-slate-600 text-center flex items-center justify-center gap-1.5">
+                        <Clock className="w-3 h-3" /> Sincronización en tiempo real con Workspace · Solo visible para Administradores
+                    </p>
+                </div>
+            </div>
+        );
+    };
+
+    const { isAdmin } = useAuth();
+    const [activeTab, setActiveTab] = useState("datos-generales");
+
     const tabs = [
         { id: "datos-generales", label: "Datos Generales", content: TabDatosGenerales },
         { id: "plazos", label: "Cálculo de Plazos", content: TabPlazos },
         { id: "mediacion", label: "Mediación", content: TabMediacion },
         { id: "documentacion", label: "Documentación", content: TabDocumentacion },
     ];
+
+    if (isAdmin) {
+        tabs.push({ id: "correo", label: "Correo", content: <TabCorreo /> });
+    }
 
     return (
         <div className="max-w-5xl mx-auto pb-12 relative animate-in fade-in duration-500">
@@ -476,7 +613,7 @@ export function ClientExpedienteDetail({ id }: { id: string }) {
             )}
 
             {/* Tabs */}
-            <Tabs tabs={tabs} defaultTab="datos-generales" />
+            <Tabs tabs={tabs} defaultTab="datos-generales" onTabChange={(id) => setActiveTab(id)} />
 
             {/* Toast Alerta */}
             {toastMensaje && (
